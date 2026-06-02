@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: racunari_db
+    restart: always
+    environment:
+      POSTGRES_USER: korisnik
+      POSTGRES_PASSWORD: lozinka
+      POSTGRES_DB: prodavnica
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  # <--- DODANA LINIJA ZA POPUNJAVANJE BAZE
+    networks:
+      - app_network
+
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: racunari_backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: db
+      DB_NAME: prodavnica
+      DB_USER: korisnik
+      DB_PASSWORD: lozinka
+    volumes:
+      - ./backend:/app  # Omogućava hot-reload (povezuje tvoj lokalni folder sa onim u kontejneru)
+    networks:
+      - app_network
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: racunari_frontend
+    restart: always
+    ports:
+      - "3000:80"  # Aplikacija će biti dostupna na http://localhost:3000
+    volumes:
+      - ./frontend:/usr/share/nginx/html  # <--- OVO JE HOT RELOAD
+    networks:
+      - app_network
+    depends_on:
+      - backend
+
+networks:
+  app_network:
+    external: true
+
+# Definicija trajnog volumena za bazu podataka
+volumes:
+  db_data:
+    external: true
+    

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Oprema - Cloud</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f0f2f5; margin: 0; padding: 30px; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; display: flex; gap: 30px; }
+        
+        /* Lijevi dio - Proizvodi */
+        .proizvodi-sekcija { flex: 3; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        h1 { margin: 0; color: #1a73e8; }
+        .btn-ucitaj { padding: 10px 20px; background: #1a73e8; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; }
+        .cijena { font-size: 20px; font-weight: bold; color: #1e8e3e; margin: 10px 0; }
+        .btn-kupi { background: #34a853; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; width: 100%; }
+        .btn-kupi:hover { background: #2d8f47; }
+
+        /* Desni dio - Korpa */
+        .korpa-sekcija { flex: 1; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); height: fit-content; position: sticky; top: 30px; }
+        .korpa-stavka { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 14px; }
+        .ukupno { font-size: 18px; font-weight: bold; margin-top: 15px; color: #d93025; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="proizvodi-sekcija">
+            <div class="header">
+                <h1>IT Zalihe Cloud</h1>
+                <button class="btn-ucitaj" onclick="ucitajSve()">🔄 Spoji se na sistem</button>
+            </div>
+            <div id="proizvodi-grid" class="grid">
+                <p>Klikni dugme iznad da učitaš proizvode.</p>
+            </div>
+        </div>
+
+        <div class="korpa-sekcija">
+            <h3>🛒 Tvoja Korpa</h3>
+            <div id="korpa-lista">
+                <p style="color: gray; font-size: 14px;">Korpa je prazna.</p>
+            </div>
+            <div class="ukupno" id="ukupna-cijena">Ukupno: 0.00 KM</div>
+        </div>
+    </div>
+
+    <script>
+        // Učitava i proizvode i korpu odjednom
+        function ucitajSve() {
+            ucitajProizvode();
+            ucitajKorpu();
+        }
+
+        async function ucitajProizvode() {
+            const res = await fetch('/api/proizvodi');
+            const podaci = await res.json();
+
+            let html = '';
+            podaci.forEach(p => {
+                html += `
+                    <div class="card">
+                        <img id="slika-${p.id}" alt="${p.naziv}" style="width:100%; height:140px; object-fit:cover; border-radius:8px; background:#eee;" />
+                        <div style="font-size: 18px; font-weight:bold; margin-top:8px;">${p.naziv}</div>
+                        <div style="color: gray; font-size: 12px;">${p.kategorija}</div>
+                        <div class="cijena">${p.cijena} KM</div>
+                        <button class="btn-kupi" onclick="dodajUKorpu(${p.id})">Dodaj u korpu</button>
+                    </div>`;
+            });
+            document.getElementById('proizvodi-grid').innerHTML = html;
+
+            podaci.forEach(p => ucitajSliku(p.id));
+        }
+
+        async function ucitajSliku(proizvod_id) {
+            try {
+                const res = await fetch(`/api/proizvod/${proizvod_id}/slika`);
+                if (!res.ok) return;
+                const podaci = await res.json();
+                const img = document.getElementById(`slika-${proizvod_id}`);
+                if (img) img.src = podaci.url;
+            } catch (e) { /* slika nije obavezna */ }
+        }
+
+        async function ucitajKorpu() {
+            const res = await fetch('/api/korpa');
+            const stavke = await res.json();
+            
+            let html = '';
+            let total = 0;
+
+            if (stavke.length === 0) {
+                html = '<p style="color: gray; font-size: 14px;">Korpa je prazna.</p>';
+            } else {
+                stavke.forEach(s => {
+                    let ukupnoStavka = s.cijena * s.kolicina;
+                    total += ukupnoStavka;
+                    html += `
+                        <div class="korpa-stavka" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <b>${s.kolicina}x</b> ${s.naziv} <br>
+                                <span style="color: gray;">${ukupnoStavka.toFixed(2)} KM</span>
+                            </div>
+                            <button onclick="obrisiIzKorpe(${s.id})" style="background: none; border: none; cursor: pointer; font-size: 18px;" title="Obriši">🗑️</button>
+                        </div>`;
+                });
+            }
+            
+            document.getElementById('korpa-lista').innerHTML = html;
+            document.getElementById('ukupna-cijena').innerText = `Ukupno: ${total.toFixed(2)} KM`;
+        }
+
+        async function dodajUKorpu(proizvod_id) {
+            await fetch('/api/korpa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ proizvod_id: proizvod_id })
+            });
+            // Osvježi samo korpu nakon klika
+            ucitajKorpu(); 
+        }
+
+        async function obrisiIzKorpe(stavka_id) {
+            await fetch(`/api/korpa/${stavka_id}`, {
+                method: 'DELETE'
+            });
+            // Osvježi korpu nakon brisanja
+            ucitajKorpu(); 
+        }
+    </script>
+</body>
+</html>

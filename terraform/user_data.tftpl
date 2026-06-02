@@ -1,0 +1,50 @@
+#!/bin/bash
+exec > /var/log/user-data.log 2>&1
+set -eux
+
+# 1) Update sistema i instalacija Docker, git, PostgreSQL klijenta
+dnf update -y
+dnf install -y docker git postgresql15
+
+# 2) Pokreni Docker i dodaj ec2-user u docker grupu
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+# 3) Instalacija Docker Compose plugin-a (nije u Amazon Linux 2023 repo-u)
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# 4) Kloniraj repo aplikacije
+cd /opt
+git clone ${github_repo_url}
+cd Projekat2_AWS
+
+# 5) Kreiraj .env sa konfiguracijom (RDS endpoint, S3 bucket, AWS region)
+cat > .env <<ENV_EOF
+DB_HOST=${rds_endpoint}
+DB_NAME=${db_name}
+DB_USER=${db_user}
+DB_PASSWORD=${db_password}
+S3_BUCKET=${s3_bucket}
+AWS_REGION=${aws_region}
+AWS_ACCESS_KEY_ID=${aws_access_key}
+AWS_SECRET_ACCESS_KEY=${aws_secret_key}
+ENV_EOF
+
+# 6) Ako je ova instanca odgovorna za init bazu, pokreni init.sql preko psql-a.
+#    Idempotentna provjera — preskoci ako tabela 'racunari' vec ima podataka.
+%{ if run_db_init }
+sleep 10
+COUNT=$(PGPASSWORD="${db_password}" psql -h ${rds_endpoint} -U ${db_user} -d ${db_name} -t -c "SELECT COUNT(*) FROM racunari" 2>/dev/null | tr -d ' \n' || echo 0)
+if [ -z "$COUNT" ] || [ "$COUNT" = "0" ]; then
+  echo "Baza prazna, pokrecem init.sql"
+  PGPASSWORD="${db_password}" psql -h ${rds_endpoint} -U ${db_user} -d ${db_name} -f init.sql
+else
+  echo "Baza vec ima $COUNT proizvoda, preskacem init"
+fi
+%{ endif }
+
+# 7) Build i pokreni Docker stack (frontend nginx + backend gunicorn)
+docker compose --env-file .env up -d --build
