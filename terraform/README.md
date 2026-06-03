@@ -22,13 +22,25 @@ ručni deployment iz DIO 1, samo automatski jednom komandom.
 
 ## Konfiguracija kredencijala
 
-Sandbox kredencijali se mijenjaju svaki put kad se restartuje sesija.
-Uzmi ih iz **AWS Details** linka u Academy tabu i postavi u environment:
+Kredencijali se uzimaju iz **AWS Details** linka u Academy tabu i postavljaju u environment.
+
+AWS Academy Cloud Operations Sandbox koristi trajni IAM ključ korisnika `awsstudent`
+(access key počinje sa `AKIA`), bez session tokena:
 
 ```bash
-export AWS_ACCESS_KEY_ID="..."
+export AWS_ACCESS_KEY_ID="AKIA..."
 export AWS_SECRET_ACCESS_KEY="..."
-export AWS_SESSION_TOKEN="..."
+export AWS_DEFAULT_REGION="us-east-1"
+```
+
+> Napomena: ako koristiš klasični Learner Lab (privremeni ključ koji počinje sa `ASIA`),
+> tada je potreban i `export AWS_SESSION_TOKEN="..."`. Cloud Operations Sandbox ga ne koristi.
+
+EC2 instance koriste iste ključeve za pristup S3 (jer Sandbox ne dozvoljava IAM role na EC2):
+
+```bash
+export TF_VAR_ec2_aws_access_key="$AWS_ACCESS_KEY_ID"
+export TF_VAR_ec2_aws_secret_key="$AWS_SECRET_ACCESS_KEY"
 ```
 
 Provjera da radi:
