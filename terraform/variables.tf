@@ -97,7 +97,7 @@ variable "ec2_aws_secret_key" {
 variable "github_repo_url" {
   description = "URL GitHub repozitorija sa aplikacijom (klonira se na EC2 prilikom pokretanja)"
   type        = string
-  default     = "https://github.com/armincoralic10/Projekat2_AWS.git"
+  default     = "https://github.com/armincoralic10/Projekat2_Cloud_Armin_Coralic.git"
 }
 
 variable "s3_bucket_prefix" {
